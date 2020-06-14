@@ -16,23 +16,22 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Device configuration
 print("[INFO] Utilized device as [{}]".format(device))
 batch_size = 32
-learning_rate = 2e-5
+learning_rate = 1e-5
 
 def train_model(args, model):
     """The model training subroutine
     """
-    counter = 0
     criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
     path_to_trainset = '/Users/ari/Downloads/ml_dataset/train/'
     label_map = load_label('/Users/ari/Downloads/ml_dataset/train.csv')
     dataset_loader = load_dataset(path_to_trainset)
-    for epoch in range(1):    #args.num_epoches
+    for epoch in range(1,2):    #args.num_epoches
         # generate a dataset(str)
         ts,ds = next(dataset_loader)
         flag = 1
-        while flag: # exploit training set
-            break   # debug
+        counter = 1
+        while flag: # exploit training set by 'bags' ==> to generate samples with diverse classes
             images,labels,tot = [],[],[]
             # fetch 5 bags of samples and "shuffle" them 
             # Then feed to the NN
@@ -53,7 +52,10 @@ def train_model(args, model):
             partition = []
             for i in range(0, len(images), batch_size):
                 partition.append(i) 
+            step = 0    # current 'bags'
             for pt in range(len(partition) - 1):
+                print('[INFO] Now do training .. Epoch{} | Bag{} | miniBatch{}'
+                    .format(epoch, counter, step))
                 # A batch train
                 if pt == len(partition) - 1:
                     image_batch, label_batch = torch.cat(images[partition[pt]: ], dim=0), torch.cat(labels[partition[pt]: ],dim=0)
@@ -71,26 +73,24 @@ def train_model(args, model):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
-                if counter % (batch_size * 10) == 0:
-                    print('[INFO] Epoch[{}/{}], Step[{}] | Loss: {:.5f}'
-                          .format(epoch+1, 1, counter+1, loss.item())) # args.num_epoches
-                #if counter % (batch_size * args.save_checkpoint_steps) == 0:
-                #    save_training_checkpoint(model, False, counter//batch_size)
-                counter += batch_size
-            break
+                step += 1
+            print('[INFO] Epoch[{}/{}], Step[{}] | Loss: {:.5f}'
+                  .format(epoch, 2, counter, loss.item())) # args.num_epoches
+            #if counter % (batch_size * args.save_checkpoint_steps) == 0:
+            #    save_training_checkpoint(model, False, counter//batch_size)
+            if (counter + 1) % 10 == 0:
+                torch.save(model,'model-{}.ckpt'.format(counter))
+            counter += 1
+            
         # ==== Evaluate this epoch result using dev set ====
-        
+        torch.save(model,'epoch-{}.ckpt'.format(epoch))
         images,scores,labels,ytrues = [],[],[],[]
     
         while(ds):
-            print('[DEBUG-1]')
             dirname = ds.pop()
             tmp_images, tmp_labels = unpack_directory(dirname, path_to_trainset, label_map)
             images.extend(tmp_images)
             labels.extend(tmp_labels)
-            if len(images) >= 50:# debug
-                break
         # Predicted score
         partition = []
         for i in range(0, len(images), batch_size):
@@ -106,7 +106,6 @@ def train_model(args, model):
                 y_gold = torch.cat(label_batch, dim=0)
             image_batch.to(device)
             out = model(image_batch).detach()
-            print('[DEBUG-2]')
             scores.append(out)
             ytrues.append(y_gold)
         # concat
@@ -117,7 +116,6 @@ def train_model(args, model):
         y_pred = np.array([[1 if i > thresh else 0 for i in j] for j in y_score])
         
         # To obtain the Gold label(multi-class)
-        print('[DEBUG-3]')
         # AUC Eval
         roc_auc = metrics.roc_auc_score(y_true, y_score, average='macro')
         # macro F1 Eval
@@ -134,7 +132,7 @@ def train_model(args, model):
             fpr, tpr, threshold = metrics.roc_curve(y_t, y_s)
             fpr_list.append(fpr)
             tpr_list.append(tpr)
-        print('[DEBUG-3]')
+
         fpr = np.concatenate(fpr_list)
         tpr = np.concatenate(tpr_list)
 
@@ -158,9 +156,11 @@ def train_model(args, model):
 
 def predict():
     model = torch.load(path_to_model)
-
+    pass
 
 
 if __name__ == "__main__":
     model  = ResNet(BasicBlock, [2,2,2,2], 512, 512)
-    train_model(1,model)
+    # model = AlexNet(10)
+    # model = VGG(make_layers(cfg['A'], batch_norm=True))
+    train_model(1, model)
