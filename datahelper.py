@@ -24,6 +24,8 @@ def load_label(filename):
         filename: /path/to/file/of/csvlabel/ (csv)
     Return:
         dirname_label_map: a hashmap {dirname <--> label} (dict: str->list[int])
+    Example:
+        {..., INDEX10097: [3, 7] ,}
     """
     dirname_label_map = {}
     with open(filename,'r') as cfile:
@@ -37,8 +39,8 @@ def load_label(filename):
 
 
 
-def load_dataset(path_to_trainset, dev_ratio=0.2, num_epoch=3):
-    """Generator SHUFFLE and generate the partitioned training set and dev set for an epoch
+def load_dataset(path_to_trainset, dev_ratio=0.05, num_epoch=3):
+    """Generator, generate the partitioned training set and dev set for an epoch
     Args:
         path_to_trainset: The directory where the training dataset locate
             For example: /Users/apple/Downloads/ml_dataset/train/
@@ -56,6 +58,7 @@ def load_dataset(path_to_trainset, dev_ratio=0.2, num_epoch=3):
     logging.info(' Load directory path done.')
     training_size = int(len(total_sets) * (1 - dev_ratio)) # train set size
     for epoch in range(num_epoch):
+        # shuffle(total_sets) ==> generate a partiton: trainingset and devset
         shuffle(total_sets)
         training_set = total_sets[:training_size]
         dev_set = total_sets[training_size:]
@@ -66,6 +69,7 @@ def load_dataset(path_to_trainset, dev_ratio=0.2, num_epoch=3):
 
 def unpack_directory(dirname, path_to_trainset, label_map):
     """directory_name -> images with label
+    Each photo in the same bag has SAME label
     str -> 
         list of torchTensor(unsqueezed at dim=0), list of torchTensor(unsqueezed at dim=0)
         *Reversable by unloader
@@ -74,7 +78,7 @@ def unpack_directory(dirname, path_to_trainset, label_map):
     Examples:
         unpack_directory('ENSG00000001630','/Users/apple/Downloads/ml_dataset/train/', label_map)
     Returns:
-        raw_images(Tensors), labels(ndaarays)
+        raw_images(Tensors), labels(Tensors)
     """
     chdir(path_to_trainset)
 
@@ -85,7 +89,7 @@ def unpack_directory(dirname, path_to_trainset, label_map):
     for sample in training_samples:
         gold_label = label_map[dirname]
         # Float format
-        label = torch.zeros((10),dtype=torch.float)
+        label = torch.zeros((10),dtype=torch.float32)
         for index in gold_label:
             label[index] = 1.
         label = label.unsqueeze(0)  # dim: 0
@@ -96,8 +100,6 @@ def unpack_directory(dirname, path_to_trainset, label_map):
         raw_images.append(image)
         #print("Loading Image: %.2f" % (count/training_size), end='\r', flush=True)
     return raw_images, labels
-
-
 
 
 if __name__ == "__main__":
@@ -111,6 +113,5 @@ if __name__ == "__main__":
     dirname = ts[10]
     images, labels = unpack_directory(dirname, path_to_trainset,label_map)
     print(images[0].shape, labels[0].shape, ' | sample size = {}, {}'.format(len(images), len(labels)))
-    
     
     
