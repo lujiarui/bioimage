@@ -1,0 +1,9 @@
+#  use pip install -r requirements.txt to install
+torchvision
+sklearn
+numpy
+opencv-python==3.4.2.16
+opencv-contrib-python==3.4.2.16
+matplotlib
+pytorch
+pillow

@@ -1,5 +1,6 @@
+
 """
-    Model for the classification
+    Model for the classification, ResNet from scratch
 """
 import random
 import math
@@ -175,167 +176,10 @@ class ResNet(nn.Module):
         return x
 
 
-class AlexNet(nn.Module):
-    """
-    Neural network model consisting of layers propsed by AlexNet paper.
-    """
-    def __init__(self, num_classes=10):
-        """
-        Define and allocate layers for this neural net.
-        Args:
-            num_classes (int): number of classes to predict with this model
-        """
-        super().__init__()
-        # input size should be : (b x 3 x 512 x 512)
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=96, kernel_size=11, stride=4),  # (b x 96 x 126 x 126)
-            nn.ReLU(),
-            nn.LocalResponseNorm(size=5, alpha=0.0001, beta=0.75, k=2), 
-            nn.MaxPool2d(kernel_size=3, stride=2),  # (b x 96 x 63 x 63)
-            nn.Conv2d(96, 256, 5, padding=2),  # (b x 256 x 63 x 63)
-            nn.ReLU(),
-            nn.LocalResponseNorm(size=5, alpha=0.0001, beta=0.75, k=2),
-            nn.MaxPool2d(kernel_size=3, stride=2),  # (b x 256 x 30 x 30)
-            nn.Conv2d(256, 384, 3, padding=1),  # (b x 384 x 30 x 30)
-            nn.ReLU(),
-            nn.Conv2d(384, 384, 3, padding=1),  # (b x 384 x 30 x 30)
-            nn.ReLU(),
-            nn.Conv2d(384, 256, 3, padding=1),  # (b x 256 x 30 x 30)
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2),  # (b x 256 x 14 x 14)
-        )
-        # classifier is just a name for linear layers
-        self.classifier = nn.Sequential(
-            nn.Dropout(p=0.5, inplace=True),
-            nn.Linear(in_features=(256 * 14 * 14), out_features=4096),
-            nn.ReLU(),
-            nn.Dropout(p=0.5, inplace=True),
-            nn.Linear(in_features=4096, out_features=4096),
-            nn.ReLU(),
-            nn.Linear(in_features=4096, out_features=num_classes),
-            nn.Sigmoid()
-        )
-        self.init_bias()  # initialize bias
 
-    def init_bias(self):
-        for layer in self.net:
-            if isinstance(layer, nn.Conv2d):
-                nn.init.normal_(layer.weight, mean=0, std=0.01)
-                nn.init.constant_(layer.bias, 0)
-        # original paper = 1 for Conv2d layers 2nd, 4th, and 5th conv layers
-        nn.init.constant_(self.net[4].bias, 1)
-        nn.init.constant_(self.net[10].bias, 1)
-        nn.init.constant_(self.net[12].bias, 1)
-
-    def forward(self, x):
-        """
-        Pass the input through the net.
-        Args:
-            x (Tensor): input tensor
-        Returns:
-            output (Tensor): output tensor
-        """
-        x = self.net(x)
-        x = x.view(-1, 256 * 14 * 14)  # reduce the dimensions for linear layer input
-        return self.classifier(x)
-
-class VGG(nn.Module):
-    '''
-        VGG Model, output = 10
-    '''
-
-    def __init__(self, features):
-
-        super(VGG, self).__init__()
-        self.features = features
-        self.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(512*16*16, 4096),
-            nn.ReLU(True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(True),
-            nn.Linear(4096, 10),
-        )
-
-        # Initialize weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-                m.bias.data.zero_()
-
-    def forward(self, x):
-        x = self.features(x)
-        x = x.view(x.size(0), -1)
-        x = self.classifier(x)
-        return x
-
-def make_layers(cfg, batch_norm=False):
-
-    layers = []
-    in_channels = 3
-    for v in cfg:
-        if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]   # // 2
-        else:
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)    # dimension not change
-            if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
-            else:
-                layers += [conv2d, nn.ReLU(inplace=True)]
-            in_channels = v
-
-    return nn.Sequential(*layers)
-
-# From https://github.com/pytorch/vision/blob/master/torchvision/models/vgg.py
-# A VGG11, 
-# B VGG13,
-# D VGG16,
-# E VGG19.
-cfg = {
-    'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'B': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
-    'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M',
-          512, 512, 512, 512, 'M'],
-}
-
-
-class ConvNN(nn.Module):
-    def __init__(self, input_channels, image_size, output_size):
-        super(ConvNN, self).__init__()
-        self.cvlayer = nn.Sequential(
-            nn.Conv2d(input_channels, 64, kernel_size=5, stride=1, padding=2),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2,2), stride=2),
-            nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2,2), stride=2),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.Conv2d(32, 8, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2,2), stride=2))
-        self.layerfc = nn.Linear(image_size//8 * image_size//8 * 8, output_size)
-    def forward(self, x):
-        out = self.cvlayer(x)
-        out = out.reshape(out.size(0),-1)
-        out = self.layerfc(out)
-        return F.sigmoid(out)
 
 if __name__ == "__main__":
     image1 = torch.randn(3,512,512).unsqueeze(0)
     # resnet18
     rn = ResNet(BasicBlock, [2,2,2,2], 512, 512)
-    an = AlexNet(10)
-    cnn = ConvNN(3,512,10)
-    vgg = VGG(make_layers(cfg['A'], batch_norm=True))
     print(rn(image1))
-    print(an(image1))
-    print(cnn(image1))
-    print(vgg(image1))

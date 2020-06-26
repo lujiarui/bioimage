@@ -1,55 +1,40 @@
 from __future__ import print_function
 
-import argparse
 import os
 import logging
 import random
 
 import torch
-import torch.nn as nn
 
-from model import ConvNN
-from train import train_model
-
-
-
-
-# Parser
-parser = argparse.ArgumentParser(description='Machine-Learning-parameters')
-parser.add_argument('--lr', type=float, default=3e-5,
-                    help='learning rate (default: 3e-5')
-parser.add_argument('--num-epoches', type=int, default=3,
-                    help='number of training epoches')
-parser.add_argument('--batch-size', type=int, default=32,
-                    help='training/eval/predict batch size')
-parser.add_argument('--do-train', default=True,
-                    help='do training subroutine')
-parser.add_argument('--do-predict',default=False,
-                    help='load local checkpoint and do predict')
-parser.add_argument('--init-checkpoint', type=str, default=None,
-                    help='load model ckpt and predict or train')
-parser.add_argument('--path-to-trainset', type=str, default=None,
-                    help='path to the training dataset')
-parser.add_argument('--path-to-testset', type=str, default=None,
-                    help='path to the predict/test dataset')        
-parser.add_argument('--output-dir', type=str, default=None,
-                    help='path to the directory where output file located')              
-parser.add_argument('--save-checkpoint-steps', type=int, default=500,
-                    help='save model checkpoint per n steps')
-
+from model import ResNet
+from train import *
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    model = ResNet(BasicBlock, [2,2,2,2], 512, 512)
-    
-    # Simulate the train-subroutine
-    # COPY from datahelper
-    if args.do_train:
+    args = {
+        'epoches': 60,
+        'batch_size': 32,
+        'lr': 1e-3,
+        'bag_size': 20,
+        'do_train': False,
+        'do_eval': False,
+        'do_predict': True,
+        'steps_save_ckpt': 10,
+        'dataset_dir': '/chpc/home/stu-jrlu-a/ml_dataset/',
+        'init_checkpoint': 'resnet18-init.ckpt,
+        'output_dir': '/chpc/home/stu-jrlu-a/ml_dataset/'
+    }
+    if args['do_train']:
+        model = ResNet(BasicBlock, [2,2,2,2], 512, 512)
         train_model(args, model)
-    
-    if args.do_predict:
-        predict(args)
+    if args['do_eval']:
+        model= torch.load(args['output_dir'] + args['init_checkpoint'])
+        eval(args, model)
+    if args['do_predict']:
+        model= torch.load(args['output_dir'] + args['init_checkpoint'])
+        predict(args, model)
+
+
     
 
 

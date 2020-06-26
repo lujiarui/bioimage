@@ -1,8 +1,9 @@
 import numpy as np
-
+from sklearn import metrics
+import matplotlib.pyplot as plt
 
 # Utils
-# --------------------------
+
 def save_training_checkpoint(torch_model, isBest, episode_count):
     """Save trained models
     """
@@ -36,3 +37,31 @@ def weight_init(m):
         w_bound = np.sqrt(6. / (fan_in + fan_out))
         m.weight.data.uniform_(-w_bound, w_bound)
         m.bias.data.fill_(0)
+
+
+def plot(y_score, y_true, path):
+    """plot the ROC of each label
+    """
+    fpr_list, tpr_list, auc_list = [], [], []
+    label_ct = 0
+    # single label
+    for y_t, y_s in zip(y_true.numpy().transpose(), y_score.numpy().transpose()):
+        fpr, tpr, threshold = metrics.roc_curve(y_t, y_s)
+        auc = metrics.roc_auc_score(y_t, y_s, average='macro')
+        auc_list.append(auc)
+        fpr_list.append(np.array(fpr))
+        tpr_list.append(np.array(tpr))
+        label_ct += 1
+    
+    plt.plot([0, 1], [0, 1], lw=2, linestyle='--')
+    for i in range(label_ct):
+        plt.plot(fpr_list[i], tpr_list[i],
+                lw=1.5, label='Label[%d] ROC-curve (area = %0.2f)' % (i, auc_list[i])) 
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Evaluation on dev set for protein photography classification')
+    plt.legend(loc="lower right")
+    plt.savefig(path + 'roc-curve.png')
+    plt.close()

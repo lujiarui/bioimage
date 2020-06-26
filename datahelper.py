@@ -8,6 +8,7 @@ import csv
 from random import shuffle
 import logging
 
+import cv2
 from PIL import Image
 from torchvision import transforms
 import torch
@@ -39,7 +40,7 @@ def load_label(filename):
 
 
 
-def load_dataset(path_to_trainset, dev_ratio=0.05, num_epoch=3):
+def load_dataset(path_to_trainset, dev_ratio=0.08, num_epoch=40):
     """Generator, generate the partitioned training set and dev set for an epoch
     Args:
         path_to_trainset: The directory where the training dataset locate
@@ -63,11 +64,10 @@ def load_dataset(path_to_trainset, dev_ratio=0.05, num_epoch=3):
         training_set = total_sets[:training_size]
         dev_set = total_sets[training_size:]
         yield training_set, dev_set
-
     
 
 
-def unpack_directory(dirname, path_to_trainset, label_map):
+def unpack_directory(dirname, path_to_trainset, label_map=None):
     """directory_name -> images with label
     Each photo in the same bag has SAME label
     str -> 
@@ -86,6 +86,13 @@ def unpack_directory(dirname, path_to_trainset, label_map):
     raw_images = []
     labels = []
     sample_size = len(training_samples)
+    if not label_map:
+        for sample in training_samples:
+        # imagefiles --> (float but not defined) tensors
+            image = Image.open("./%s/%s" % (dirname,sample)).convert('RGB')
+            image = loader(image).unsqueeze(0)  # dim: 0
+            raw_images.append(image)
+        return raw_images
     for sample in training_samples:
         gold_label = label_map[dirname]
         # Float format
@@ -98,20 +105,15 @@ def unpack_directory(dirname, path_to_trainset, label_map):
         image = Image.open("./%s/%s" % (dirname,sample)).convert('RGB')
         image = loader(image).unsqueeze(0)  # dim: 0
         raw_images.append(image)
-        #print("Loading Image: %.2f" % (count/training_size), end='\r', flush=True)
     return raw_images, labels
 
+def csv_record(filename, rows):
+    """One time write
+    Args:
+        rows: python list
+    """
+    with open(filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile, delimiter=',')
+        for row in rows:
+            writer.writerow(row)
 
-if __name__ == "__main__":
-    # Usage
-    path_to_trainset = '/Users/ari/Downloads/ml_dataset/train/'
-    dataset_loader = load_dataset(path_to_trainset)
-    ts,ds = next(dataset_loader)
-    
-    print(ts[0], ds[0], ' | train_set size = {}, dev_set size = {}'.format(len(ts),len(ds)))
-    label_map = load_label('/Users/ari/Downloads/ml_dataset/train.csv')
-    dirname = ts[10]
-    images, labels = unpack_directory(dirname, path_to_trainset,label_map)
-    print(images[0].shape, labels[0].shape, ' | sample size = {}, {}'.format(len(images), len(labels)))
-    
-    
